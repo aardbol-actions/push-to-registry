@@ -29,8 +29,8 @@
     "@redhat-actions/tsconfig": "^1.2.0",
     "@types/ini": "^4.1.0",
     "@types/node": "^20.11.24",
-    "@typescript-eslint/eslint-plugin": "^7.1.1",
-    "@typescript-eslint/parser": "^7.1.1",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
     "@vercel/ncc": "^0.38.1",
     "eslint": "^8.57.0",
     "typescript": "5.3"
