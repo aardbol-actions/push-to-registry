@@ -1,12 +1,12 @@
-# This workflow will perform a test whenever there
-# is some change in code done to ensure that the changes
-# are not buggy and we are getting the desired output.
 name: Push to Quay.io
 on:
   push:
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *'  # every day at midnight
+
+permissions:
+  contents: read
 
 env:
   IMAGE_NAME: ptr-test
@@ -17,26 +17,23 @@ env:
 jobs:
   push-quay:
     name: Build and push image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         install_latest: [ true, false ]
 
     steps:
-      # Checkout push-to-registry action github repository
-      - name: Checkout Push to Registry action
-        uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install latest podman
         if: matrix.install_latest
         run: |
           bash .github/install_latest_podman.sh
 
-      # Build image using Buildah action
       - name: Build Image
         id: build_image
-        uses: redhat-actions/buildah-build@v2
+        uses: aardbol-actions/buildah-build@efe897b4cfe775f3e057a442c3d9fbd9db18a669 # v3.0.2
         with:
           image: ${{ env.IMAGE_NAME }}
           tags: ${{ env.IMAGE_TAGS }}
@@ -47,7 +44,6 @@ jobs:
             echo 'hello world'
           oci: true
 
-      # Push the image to Quay.io (Image Registry)
       - name: Push To Quay
         uses: ./
         id: push
