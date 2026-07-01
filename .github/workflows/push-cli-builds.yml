@@ -1,25 +1,43 @@
 name: Multiple container CLI build tests
 on:
   push:
+  pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'  # every day at midnight
 
 permissions:
   contents: read
 
 env:
-  IMAGE_REGISTRY: quay.io
-  IMAGE_NAMESPACE: redhat-github-actions
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
   IMAGE_NAME: ptr-test
   IMAGE_TAG: v1
   SHORT_IMAGE_NAME_TAG: ptr-test:v1
-  FULLY_QUALIFIED_IMAGE_NAME_TAG: quay.io/redhat-github-actions/ptr-test:v1
+  FULLY_QUALIFIED_IMAGE_NAME_TAG: ghcr.io/${{ github.repository_owner }}/ptr-test:v1
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      action: ${{ steps.filter.outputs.action }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          filters: |
+            action:
+              - 'src/**'
+              - 'dist/**'
+              - 'action.yml'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/push-cli-builds.yml'
+
   build:
     name: |-
-      Build with ${{ matrix.build_with }} and push${{ matrix.fully_qualified_image_name_tag && ' FQIN' || '' }} (latest: ${{ matrix.install_latest }})
+      Build with ${{ matrix.build_with }} and push${{ matrix.fully_qualified_image_name_tag && ' FQIN' || '' }}
+    needs: changes
+    if: ${{ needs.changes.outputs.action == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -60,10 +78,15 @@ jobs:
         with:
           image: ${{ env.IMAGE_NAME }}
           tags: ${{ matrix.fully_qualified_image_name_tag && env.FULLY_QUALIFIED_IMAGE_NAME_TAG || env.IMAGE_TAG }}
-          registry: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAMESPACE }}
-          username: ${{ secrets.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Echo outputs
         run: |
-          echo "${{ toJSON(steps.push.outputs) }}"
+          echo "digest: ${{ steps.push.outputs.digest }}"
+          echo "registry-path: ${{ steps.push.outputs.registry-path }}"
+          echo "registry-paths: ${{ steps.push.outputs.registry-paths }}"
+
+      - name: Check images created
+        run: buildah images | grep '${{ env.IMAGE_NAME }}'

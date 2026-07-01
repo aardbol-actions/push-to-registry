@@ -1,4 +1,4 @@
-name: Check Case Normalization
+name: Build and Push Manifest
 on:
   push:
   pull_request:
@@ -8,8 +8,8 @@ permissions:
   contents: read
 
 env:
-  IMAGE_NAME: ImageCaseTest
-  IMAGE_TAGS: v1 TagCaseTest
+  IMAGE_NAME: ptr-manifest
+  IMAGE_TAGS: v1
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ github.token }}
@@ -21,7 +21,6 @@ jobs:
       action: ${{ steps.filter.outputs.action }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
@@ -32,10 +31,10 @@ jobs:
               - 'action.yml'
               - 'package.json'
               - 'package-lock.json'
-              - '.github/workflows/check-lowercase.yaml'
+              - '.github/workflows/push-manifest.yml'
 
   build:
-    name: Build image using Buildah
+    name: Build and push manifest
     needs: changes
     if: ${{ needs.changes.outputs.action == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
@@ -43,11 +42,20 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Create Dockerfile
+      - name: Install qemu dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
+
+      - name: Create Containerfile
         run: |
           cat > Containerfile<<EOF
-          FROM busybox
+
+          FROM docker.io/alpine:3.14
+
           RUN echo "hello world"
+
+          ENTRYPOINT [ "sh", "-c", "echo -n 'Machine: ' && uname -m && echo -n 'Bits: ' && getconf LONG_BIT && echo 'goodbye world'" ]
           EOF
 
       - name: Build Image
@@ -55,14 +63,12 @@ jobs:
         uses: aardbol-actions/buildah-build@efe897b4cfe775f3e057a442c3d9fbd9db18a669 # v3.0.2
         with:
           image: ${{ env.IMAGE_NAME }}
-          layers: false
           tags: ${{ env.IMAGE_TAGS }}
+          archs: amd64, arm64
           containerfiles: |
             ./Containerfile
-          extra-args: |
-            --pull
 
-      - name: Push To GHCR
+      - name: Push Manifest To GHCR
         uses: ./
         id: push
         with:
@@ -71,9 +77,17 @@ jobs:
           registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ env.REGISTRY_USER }}
           password: ${{ env.REGISTRY_PASSWORD }}
-          extra-args: |
-            --disable-content-trust
 
       - name: Echo outputs
         run: |
-          echo "${{ toJSON(steps.push.outputs) }}"
+          echo "digest: ${{ steps.push.outputs.digest }}"
+          echo "registry-path: ${{ steps.push.outputs.registry-path }}"
+          echo "registry-paths: ${{ steps.push.outputs.registry-paths }}"
+
+      - name: Check images created
+        run: buildah images | grep '${{ env.IMAGE_NAME }}'
+
+      - name: Check manifest
+        run: |
+          set -x
+          buildah manifest inspect ${{ steps.build_image.outputs.image }}:${{ env.IMAGE_TAGS }}

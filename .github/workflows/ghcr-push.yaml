@@ -1,40 +1,66 @@
 name: Push to GHCR
 on:
   push:
+  pull_request:
   workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * *'  # every day at midnight
 
 permissions:
   contents: read
 
 env:
   IMAGE_NAME: ptr-test
-  IMAGE_TAGS: v1 ${{ github.sha }}
+  IMAGE_TAGS: v1
   IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ github.token }}
 
 jobs:
-  push-ghcr:
-    name: Build and push image
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      action: ${{ steps.filter.outputs.action }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          filters: |
+            action:
+              - 'src/**'
+              - 'dist/**'
+              - 'action.yml'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/ghcr-push.yaml'
+
+  build:
+    name: Build and push image to GHCR
+    needs: changes
+    if: ${{ needs.changes.outputs.action == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Create Containerfile
+        run: |
+          cat > Containerfile<<EOF
+          FROM busybox
+          RUN echo "hello world"
+          EOF
 
       - name: Build Image
         id: build_image
         uses: aardbol-actions/buildah-build@efe897b4cfe775f3e057a442c3d9fbd9db18a669 # v3.0.2
         with:
           image: ${{ env.IMAGE_NAME }}
+          layers: false
           tags: ${{ env.IMAGE_TAGS }}
-          base-image: busybox:latest
-          entrypoint: |
-            bash
-            -c
-            echo 'hello world'
-          oci: true
+          containerfiles: |
+            ./Containerfile
+          extra-args: |
+            --pull
 
       - name: Push To GHCR
         uses: ./
@@ -50,4 +76,9 @@ jobs:
 
       - name: Echo outputs
         run: |
-          echo "${{ toJSON(steps.push.outputs) }}"
+          echo "digest: ${{ steps.push.outputs.digest }}"
+          echo "registry-path: ${{ steps.push.outputs.registry-path }}"
+          echo "registry-paths: ${{ steps.push.outputs.registry-paths }}"
+
+      - name: Check images created
+        run: buildah images | grep '${{ env.IMAGE_NAME }}'
