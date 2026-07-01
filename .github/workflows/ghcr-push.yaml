@@ -19,18 +19,9 @@ jobs:
   push-ghcr:
     name: Build and push image
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        install_latest: [ true, false ]
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Install latest podman
-        if: matrix.install_latest
-        run: |
-          bash .github/install_latest_podman.sh
 
       - name: Build Image
         id: build_image

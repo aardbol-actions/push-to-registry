@@ -8,6 +8,9 @@ on:
   schedule:
     - cron: '0 0 * * *'  # every day at midnight
 
+permissions:
+  contents: read
+
 env:
   IMAGE_REGISTRY: quay.io
   IMAGE_NAMESPACE: redhat-github-actions
@@ -17,22 +20,10 @@ env:
 jobs:
   login-and-push:
     name: Login and push image to Quay.io
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        install_latest: [ true, false ]
+    runs-on: ubuntu-24.04
 
     steps:
-
-      # Checkout push-to-registry action github repository
-      - name: Checkout Push to Registry action
-        uses: actions/checkout@v4
-
-      - name: Install latest podman
-        if: matrix.install_latest
-        run: |
-          bash .github/install_latest_podman.sh
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Create Dockerfile
         run: |
@@ -41,10 +32,9 @@ jobs:
           RUN echo "hello world"
           EOF
 
-      # Build image using Buildah action
       - name: Build Image
         id: build_image
-        uses: redhat-actions/buildah-build@v2
+        uses: aardbol-actions/buildah-build@efe897b4cfe775f3e057a442c3d9fbd9db18a669 # v3.0.2
         with:
           image: ${{ env.IMAGE_NAME }}
           layers: false
@@ -52,15 +42,13 @@ jobs:
           dockerfiles: |
             ./Dockerfile
 
-      # Authenticate to container image registry to push the image
       - name: Podman Login
-        uses: redhat-actions/podman-login@v1
+        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
         with:
           registry: quay.io
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
-      # Push the image to Quay.io (Image Registry)
       - name: Push To Quay
         uses: ./
         id: push

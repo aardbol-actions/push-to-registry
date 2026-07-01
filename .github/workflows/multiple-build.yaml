@@ -24,17 +24,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        install_latest: [ true, false ]
         build_with: [ "docker after podman", "podman after docker", "podman only", "docker only" ]
         fully_qualified_image_name_tag: [ true, false ]
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Install latest podman
-        if: matrix.install_latest
-        run: |
-          bash .github/install_latest_podman.sh
 
       - name: Build image using Docker
         if: endsWith(matrix.build_with, 'docker')
