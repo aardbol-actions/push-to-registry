@@ -28,7 +28,7 @@ export enum Inputs {
      */
     PASSWORD = "password",
     /**
-     * Hostname and optional namespace to push the image to (eg. quay.io/username or quay.io)
+     * Hostname and optional namespace to push the image to (eg. ghcr.io/username or ghcr.io)
      * Required: false
      * Default: None.
      */
