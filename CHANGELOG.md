@@ -1,5 +1,23 @@
 # push-to-registry Changelog
 
+## v3.0.0
+- chore(ci): Pinned all GitHub Actions by commit SHA with version comments
+- chore(ci): Replaced `ubuntu-latest` with `ubuntu-24.04` across all workflows
+- chore(ci): Added explicit `permissions:` blocks to all workflows
+- chore(ci): Replaced `CRDA` vulnerability scan with CodeQL, Trivy, and Scorecards workflows
+- chore(ci): Added path-filtered job gating with `dorny/paths-filter` to all test workflows
+- chore(ci): Removed Quay.io test workflows
+- chore(ci): Switched GHCR pushes to repo-scoped namespace (`ghcr.io/${{ github.repository }}`)
+- chore: Switched from `redhat-actions/common` to `aardbol-actions/common` action references
+- chore: Bumped `@actions/core` to v3, `@actions/exec` to v3, `@actions/io` to v3
+- chore: Bumped `ini` to v7, `eslint` to v10, `typescript` to v6, `@vercel/ncc` to 0.44
+- chore: Switched to `@aardbol-actions` scoped packages (`action-io-generator`, `tsconfig`)
+- chore: Migrated from legacy `.eslintrc.js` to flat config (`eslint.config.js`)
+- chore: Added `SECURITY.md`, `.editorconfig`, `.pre-commit-config.yaml`, `.github/dependabot.yml`
+- chore: Updated `tsconfig.json` extends to `@aardbol-actions/tsconfig`
+- chore: Set minimum Node engine to 24
+- fix: `fs.promises.rmdir` deprecation in source
+
 ## v2.8
 - Update action to run on Node20. https://github.blog/changelog/2023-09-22-github-actions-transitioning-from-node-16-to-node-20/
 

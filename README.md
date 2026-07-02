@@ -118,7 +118,7 @@ jobs:
     # in which case 'username' and 'password' can be omitted.
     - name: Push To GHCR
       id: push-to-ghcr
-      uses: aardbol-actions/push-to-registry@v2
+      uses: aardbol-actions/push-to-registry@v3
       with:
         image: ${{ steps.build-image.outputs.image }}
         tags: ${{ steps.build-image.outputs.tags }}

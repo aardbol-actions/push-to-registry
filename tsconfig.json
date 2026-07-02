@@ -1,5 +1,5 @@
 {
-    "extends": "@redhat-actions/tsconfig",
+    "extends": "@aardbol-actions/tsconfig",
     "compilerOptions": {
       "rootDir": "src/",
       "outDir": "out/"
