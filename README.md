@@ -2,6 +2,7 @@
 
 [![CI checks](https://github.com/aardbol-actions/push-to-registry/workflows/CI%20checks/badge.svg)](https://github.com/aardbol-actions/push-to-registry/actions?query=workflow%3A%22CI+checks%22)
 [![Link checker](https://github.com/aardbol-actions/push-to-registry/workflows/Link%20checker/badge.svg)](https://github.com/aardbol-actions/push-to-registry/actions?query=workflow%3A%22Link+checker%22)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/aardbol-actions/push-to-registry/badge)](https://securityscorecards.dev/viewer/?uri=github.com/aardbol-actions/push-to-registry)
 <br><br>
 [![Push to GHCR](https://github.com/aardbol-actions/push-to-registry/actions/workflows/ghcr-push.yaml/badge.svg)](https://github.com/aardbol-actions/push-to-registry/actions/workflows/ghcr-push.yaml)
 [![Login and Push](https://github.com/aardbol-actions/push-to-registry/workflows/Login%20and%20Push/badge.svg)](https://github.com/aardbol-actions/push-to-registry/actions?query=workflow%3A%22Login+and+Push%22)

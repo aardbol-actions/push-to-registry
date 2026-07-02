@@ -1,5 +1,8 @@
 # push-to-registry Changelog
 
+## v3.0.1
+- fix: CodeQL alert: incomplete URL substring sanitization in `getFullDockerImageName` (#15)
+
 ## v3.0.0
 - chore(ci): Pinned all GitHub Actions by commit SHA with version comments
 - chore(ci): Replaced `ubuntu-latest` with `ubuntu-24.04` across all workflows
