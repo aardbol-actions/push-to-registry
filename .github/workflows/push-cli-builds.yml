@@ -91,4 +91,6 @@ jobs:
           echo "registry-paths: ${{ steps.push.outputs.registry-paths }}"
 
       - name: Check images created
-        run: buildah images | grep '${{ env.IMAGE_NAME }}'
+        run: |
+          podman images | grep '${{ env.IMAGE_NAME }}' ||
+          docker images | grep '${{ env.IMAGE_NAME }}'
