@@ -1,23 +1,31 @@
 version: 2
 updates:
-  - package-ecosystem: "github-actions"
+  - package-ecosystem: github-actions
     commit-message:
       prefix: chore(actions)
-    directory: "/"
+    directory: /
     schedule:
       interval: weekly
       day: monday
+    groups:
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
 
-  - package-ecosystem: "npm"
+  - package-ecosystem: npm
     commit-message:
       prefix: chore(npm)
-    directory: "/"
+    directory: /
     schedule:
       interval: weekly
       day: monday
 
-  - package-ecosystem: "devcontainers" # https://containers.dev/guide/dependabot
-    directory: "/"
+  - package-ecosystem: devcontainers # https://containers.dev/guide/dependabot
+    directory: /
     schedule:
       interval: weekly
       day: monday
+    groups:
+      devcontainers:
+        patterns:
+          - "*"
