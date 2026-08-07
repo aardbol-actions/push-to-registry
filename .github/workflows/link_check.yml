@@ -1,6 +1,7 @@
 name: Link checker
 on:
   push:
+    branches: [main]
     paths:
       - "**.md"
   pull_request:
@@ -8,6 +9,10 @@ on:
       - "**.md"
   schedule:
     - cron: '0 0 * * *'  # every day at midnight
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
