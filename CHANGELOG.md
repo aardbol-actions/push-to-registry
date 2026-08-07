@@ -1,5 +1,11 @@
 # push-to-registry Changelog
 
+## v3.0.3
+- chore(deps): Bump `undici` from 6.27.0 to 6.28.0 (#2)
+- chore(ci): Group Dependabot updates into single PRs per family (GitHub Actions, devcontainers, npm)
+- chore(ci): Limit push-triggered workflows to `main` and add concurrency groups to avoid duplicate runs
+- chore(deps): Bump `js-yaml` from 4.3.0 to 4.3.1 (#3)
+
 ## v3.0.1
 - fix: CodeQL alert: incomplete URL substring sanitization in `getFullDockerImageName` (#15)
 

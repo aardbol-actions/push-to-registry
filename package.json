@@ -1,6 +1,6 @@
 {
   "name": "push-to-registry",
-  "version": "3.0.1",
+  "version": "3.0.3",
   "description": "Action to push images to registry",
   "repository": {
     "type": "git",
