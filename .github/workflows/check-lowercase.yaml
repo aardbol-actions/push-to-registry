@@ -14,8 +14,8 @@ permissions:
 
 env:
   IMAGE_NAME: ImageCaseTest
-  IMAGE_TAGS: v1 TagCaseTest
-  IMAGE_REGISTRY: ghcr.io/${{ github.repository }}
+  IMAGE_TAGS: v1 ${{ github.sha }}
+  IMAGE_REGISTRY: Ghcr.io/${{ github.repository_owner }}
   REGISTRY_USER: ${{ github.actor }}
   REGISTRY_PASSWORD: ${{ github.token }}
 
