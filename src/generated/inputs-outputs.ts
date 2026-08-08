@@ -37,7 +37,7 @@ export enum Inputs {
      */
     PODMAN_ARGS = "podman-args",
     /**
-     * Hostname and optional namespace to push the image to (eg. quay.io/username or quay.io)
+     * Hostname and optional namespace to push the image to (eg. ghcr.io/username or ghcr.io)
      * Required: false
      * Default: None.
      */

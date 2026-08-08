@@ -28,6 +28,9 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: Run Tests
+        run: npm run test
+
       - name: Verify Latest Bundle
         uses: aardbol-actions/common/bundle-verifier@a237273f41dc217821aff666362bd4aa739b18f9 # v2.0.1
         with:

@@ -86,7 +86,7 @@ export function getFullDockerImageName(image: string): string {
     case 1:
         return `${DOCKER_IO_NAMESPACED}/${image}`;
     case 2:
-if (parts[0].includes(".") || parts[0].includes(":")) {
+        if (parts[0].includes(".") || parts[0].includes(":")) {
             return image;
         }
         return `${DOCKER_IO}/${image}`;
