@@ -143,7 +143,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-- uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
     - name: Build Image
       id: build-image
@@ -156,7 +156,7 @@ jobs:
 
     # Podman Login action (https://github.com/redhat-actions/podman-login) can also be used to log in,
     # in which case 'username' and 'password' can be omitted.
-- name: Push To GHCR
+    - name: Push To GHCR
       id: push-to-ghcr
       uses: aardbol-actions/push-to-registry@v3
       with:
@@ -187,7 +187,7 @@ If the action pulled an image from the Docker image storage into the Podman stor
 If you are using `podman --remote` (e.g. with a wrapper or a remote podman server), set `remote: true`:
 
 ```yaml
-- uses: redhat-actions/push-to-registry@v3
+- uses: aardbol-actions/push-to-registry@v3
   with:
     image: my-image
     tags: latest
