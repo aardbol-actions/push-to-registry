@@ -2,9 +2,13 @@
     "extends": "@aardbol-actions/tsconfig",
     "compilerOptions": {
       "rootDir": "src/",
-      "outDir": "out/"
+      "outDir": "out/",
+      "lib": ["es2024"]
     },
     "include": [
       "src/"
     ],
+    "exclude": [
+      "src/**/*.test.ts"
+    ]
 }

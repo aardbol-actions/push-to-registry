@@ -33,6 +33,26 @@ inputs:
       By default, the filename will be determined from the image and tag.
       The contents of this file are the digest output.
     required: false
+  sigstore-private-key:
+    description: 'Sigstore private key to use to sign container images'
+    required: false
+  sign-passphrase:
+    description: 'Passphrase to unlock the Sigstore private key'
+    required: false
+  remote:
+    description: |
+      Use podman in remote mode (--remote). When true, --remote is passed to
+      all podman commands and Docker image storage checks are skipped, since
+      the Docker daemon is not accessible over the remote connection.
+    required: false
+    default: 'false'
+  podman-args:
+    description: |
+      Global args to be passed to all podman commands (before the subcommand).
+      Use this for options like --storage-driver=vfs that must apply to every
+      podman invocation (image exists, manifest exists, push, etc.).
+      Separate arguments by newline. Do not use quotes.
+    required: false
   extra-args:
     description: |
       Extra args to be passed to podman push.

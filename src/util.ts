@@ -81,11 +81,14 @@ const DOCKER_IO = `docker.io`;
 const DOCKER_IO_NAMESPACED = DOCKER_IO + `/library`;
 
 export function getFullDockerImageName(image: string): string {
-    switch (image.split("/").length) {
+    const parts = image.split("/");
+    switch (parts.length) {
     case 1:
         return `${DOCKER_IO_NAMESPACED}/${image}`;
     case 2:
-        if (image.split("/")[0].endsWith(".amazonaws.com")) { return image; }
+        if (parts[0].includes(".") || parts[0].includes(":")) {
+            return image;
+        }
         return `${DOCKER_IO}/${image}`;
     default:
         return image;

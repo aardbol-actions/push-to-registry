@@ -93,6 +93,6 @@ module.exports = tseslint.config(
     },
   },
   {
-    ignores: ["dist/", "node_modules/", "out/", "lib/", ".eslintrc.js", "eslint.config.js"],
+    ignores: ["dist/", "node_modules/", "out/", "lib/", ".eslintrc.js", "eslint.config.js", "src/**/*.test.ts"],
   },
 );

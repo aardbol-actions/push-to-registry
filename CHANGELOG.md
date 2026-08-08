@@ -1,5 +1,20 @@
 # push-to-registry Changelog
 
+## v3.1.0
+- feat: Add Sigstore signing support for container images (upstream #120)
+- feat: Add podman remote mode support (upstream #122)
+- feat: Add `podman-args` input for global podman flags (upstream #121)
+- fix: Default tag fallback to `latest` (upstream #109)
+- fix: Lowercase `registry` input for OCI compliance (upstream #110, #121)
+- fix: Complete URL substring sanitization in `getFullDockerImageName` (upstream #124)
+- fix: Preserve tag casing per OCI spec (upstream #121)
+- ci: Add workflow to rebuild bundle on Dependabot PRs (upstream #128)
+- ci: Bump `redhat-actions/podman-login` from v1 to v2 (upstream #127)
+- ci: Add test job and native node test runner
+- chore(deps): Bump `eslint` from 10.6.0 to 10.8.1
+- chore(deps): Bump `typescript-eslint`/`@typescript-eslint/*` to 8.66.0
+- chore(deps): Bump `@types/node` to 26.2.0
+
 ## v3.0.3
 - chore(deps): Bump `undici` from 6.27.0 to 6.28.0 (#2)
 - chore(ci): Group Dependabot updates into single PRs per family (GitHub Actions, devcontainers, npm)

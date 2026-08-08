@@ -1,6 +1,6 @@
 {
   "name": "push-to-registry",
-  "version": "3.0.3",
+  "version": "3.1.0",
   "description": "Action to push images to registry",
   "repository": {
     "type": "git",
@@ -13,7 +13,7 @@
     "clean": "rm -rf out/ dist/",
     "lint": "eslint . --max-warnings=0",
     "generate-ios": "npx @aardbol-actions/action-io-generator -w -o ./src/generated/inputs-outputs.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --experimental-strip-types --test src/**/*.test.ts"
   },
   "author": "Red Hat",
   "license": "MIT",
@@ -28,13 +28,13 @@
     "@aardbol-actions/tsconfig": "2.0.0",
     "@eslint/js": "^10.0.1",
     "@types/ini": "4.1.1",
-    "@types/node": "^26.0",
-    "@typescript-eslint/eslint-plugin": "8.62.0",
-    "@typescript-eslint/parser": "8.62.0",
+    "@types/node": "^26.2.0",
+    "@typescript-eslint/eslint-plugin": "8.66.0",
+    "@typescript-eslint/parser": "8.66.0",
     "@vercel/ncc": "0.44.1",
-    "eslint": "10.6.0",
+    "eslint": "10.8.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.1"
+    "typescript-eslint": "^8.66.0"
   },
   "engines": {
     "node": "24"

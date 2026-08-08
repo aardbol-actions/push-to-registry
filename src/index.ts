@@ -30,7 +30,9 @@ let isImageFromDocker = false;
 let sourceImages: string[];
 let destinationImages: string[];
 let dockerPodmanRoot: string;
-let dockerPodmanOpts: string[];
+let dockerPodmanOpts: string[] = [];
+let globalPodmanArgs: string[] = [];
+let isRemoteMode = false;
 
 async function getPodmanPath(): Promise<string> {
     if (podmanPath == null) {
@@ -44,9 +46,11 @@ async function getPodmanPath(): Promise<string> {
 async function run(): Promise<void> {
     const DEFAULT_TAG = "latest";
     const image = core.getInput(Inputs.IMAGE);
+    const registry = core.getInput(Inputs.REGISTRY);
     const tags = core.getInput(Inputs.TAGS);
     // split tags
-    const tagsList = tags.trim().split(/\s+/);
+    const trimmedTags = tags.trim();
+    const tagsList = trimmedTags ? trimmedTags.split(/\s+/) : [];
 
     // info message if user doesn't provides any tag
     if (tagsList.length === 0) {
@@ -54,44 +58,59 @@ async function run(): Promise<void> {
         tagsList.push(DEFAULT_TAG);
     }
 
-    const normalizedTagsList: string[] = [];
-    let isNormalized = false;
-    for (const tag of tagsList) {
-        normalizedTagsList.push(tag.toLowerCase());
-        if (tag.toLowerCase() !== tag) {
-            isNormalized = true;
-        }
-    }
-    const normalizedImage = image.toLowerCase();
-    if (isNormalized || image !== normalizedImage) {
-        core.warning(`Reference to image and/or tag must be lowercase.`
-        + ` Reference has been converted to be compliant with standard.`);
+    // Determine tag format before normalization so we know how to normalize.
+    const isFullImageNameTag = tagsList.length > 0 && isFullImageName(tagsList[0]);
+    if (tagsList.some((tag) => isFullImageName(tag) !== isFullImageNameTag)) {
+        throw new Error(`Input "${Inputs.TAGS}" cannot have a mix of full name and non full name tags`);
     }
 
-    const registry = core.getInput(Inputs.REGISTRY);
+    // Normalize per OCI distribution spec: image names and registries must be
+    // lowercase, but tags may contain uppercase characters.
+    const normalizedTagsList: string[] = [];
+    let imageRefsNormalized = false;
+
+    if (isFullImageNameTag) {
+        // Full image name tags like "Quay.io/User/Image:MyTag"
+        // Lowercase the image reference, preserve the tag
+        for (const tag of tagsList) {
+            const colonIndex = tag.lastIndexOf(":");
+            const imagePart = tag.substring(0, colonIndex).toLowerCase();
+            const tagPart = tag.substring(colonIndex + 1);
+            const normalized = `${imagePart}:${tagPart}`;
+            normalizedTagsList.push(normalized);
+            if (normalized !== tag) {
+                imageRefsNormalized = true;
+            }
+        }
+    }
+    else {
+        // Simple tags like "v1", "Latest" - preserve as-is per OCI spec
+        normalizedTagsList.push(...tagsList);
+    }
+
+    const normalizedImage = image.toLowerCase();
+    const normalizedRegistry = registry.toLowerCase();
+    if (imageRefsNormalized || image !== normalizedImage || registry !== normalizedRegistry) {
+        core.warning(`Image and/or registry reference has been lowercased `
+        + `to comply with the OCI distribution specification.`);
+    }
     const username = core.getInput(Inputs.USERNAME);
     const password = core.getInput(Inputs.PASSWORD);
     const tlsVerify = core.getInput(Inputs.TLS_VERIFY);
     const digestFileInput = core.getInput(Inputs.DIGESTFILE);
-
-    // check if all tags provided are in `image:tag` format
-    const isFullImageNameTag = isFullImageName(normalizedTagsList[0]);
-    if (normalizedTagsList.some((tag) => isFullImageName(tag) !== isFullImageNameTag)) {
-        throw new Error(`Input "${Inputs.TAGS}" cannot have a mix of full name and non full name tags`);
-    }
     if (!isFullImageNameTag) {
         if (!normalizedImage) {
             throw new Error(`Input "${Inputs.IMAGE}" must be provided when using non full name tags`);
         }
-        if (!registry) {
+        if (!normalizedRegistry) {
             throw new Error(`Input "${Inputs.REGISTRY}" must be provided when using non full name tags`);
         }
 
-        const registryWithoutTrailingSlash = registry.replace(/\/$/, "");
+        const registryWithoutTrailingSlash = normalizedRegistry.replace(/\/$/, "");
         const registryPath = `${registryWithoutTrailingSlash}/${normalizedImage}`;
-        core.info(`Combining image name "${normalizedImage}" and registry "${registry}" `
+        core.info(`Combining image name "${normalizedImage}" and registry "${normalizedRegistry}" `
             + `to form registry path "${registryPath}"`);
-        if (normalizedImage.indexOf("/") > -1 && registry.indexOf("/") > -1) {
+        if (normalizedImage.indexOf("/") > -1 && normalizedRegistry.indexOf("/") > -1) {
             core.warning(`"${registryPath}" does not seem to be a valid registry path. `
             + `The registry path should not contain more than 2 slashes. `
             + `Refer to the Inputs section of the readme for naming image and registry.`);
@@ -104,12 +123,21 @@ async function run(): Promise<void> {
         if (normalizedImage) {
             core.warning(`Input "${Inputs.IMAGE}" is ignored when using full name tags`);
         }
-        if (registry) {
+        if (normalizedRegistry) {
             core.warning(`Input "${Inputs.REGISTRY}" is ignored when using full name tags`);
         }
 
         sourceImages = normalizedTagsList;
         destinationImages = normalizedTagsList;
+    }
+
+    const inputPodmanArgsStr = core.getInput(Inputs.PODMAN_ARGS);
+    if (inputPodmanArgsStr) {
+        // Global args are prepended before the subcommand in every podman invocation
+        const lines = splitByNewline(inputPodmanArgsStr);
+        globalPodmanArgs = lines.flatMap((line) => line.split(" "))
+            .map((arg) => arg.trim())
+            .filter((arg) => arg);
     }
 
     const inputExtraArgsStr = core.getInput(Inputs.EXTRA_ARGS);
@@ -144,68 +172,110 @@ async function run(): Promise<void> {
             + `not found in Podman image storage`);
         }
 
-        // check if image with all the required tags exist in Docker image storage
-        // and if exist pull the image with all the tags to Podman
-        const dockerImageStorageCheckResult: ImageStorageCheckResult = await pullImageFromDocker();
-
-        const dockerFoundTags: string[] = dockerImageStorageCheckResult.foundTags;
-        const dockerMissingTags: string[] = dockerImageStorageCheckResult.missingTags;
-
-        if (dockerFoundTags.length > 0) {
-            core.info(`Tag${dockerFoundTags.length !== 1 ? "s" : ""} "${dockerFoundTags.join(", ")}" `
-            + `found in Docker image storage`);
+        if (isRemoteMode) {
+            // In remote mode, Docker image storage is not accessible.
+            // All tags must be present in the remote Podman image storage.
+            if (podmanMissingTags.length > 0) {
+                throw new Error(
+                    `❌ Tag${podmanMissingTags.length !== 1 ? "s" : ""} `
+                    + `"${podmanMissingTags.join(", ")}" not found in remote Podman image storage.`
+                );
+            }
+            core.info("Image(s) will be pushed from remote Podman image storage.");
         }
+        else {
+            // check if image with all the required tags exist in Docker image storage
+            // and if exist pull the image with all the tags to Podman
+            const dockerImageStorageCheckResult: ImageStorageCheckResult = await pullImageFromDocker();
 
-        // Log warning if few tags are not found
-        if (dockerMissingTags.length > 0 && dockerFoundTags.length > 0) {
-            core.warning(`Tag${dockerMissingTags.length !== 1 ? "s" : ""} "${dockerMissingTags.join(", ")}" `
-            + `not found in Docker image storage`);
-        }
+            const dockerFoundTags: string[] = dockerImageStorageCheckResult.foundTags;
+            const dockerMissingTags: string[] = dockerImageStorageCheckResult.missingTags;
 
-        // failing if image with any of the tag is not found in Docker as well as Podman
-        if (podmanMissingTags.length > 0 && dockerMissingTags.length > 0) {
-            throw new Error(
-                `❌ All tags were not found in either Podman image storage, or Docker image storage. `
-                + `Tag${podmanMissingTags.length !== 1 ? "s" : ""} "${podmanMissingTags.join(", ")}" `
-                + `not found in Podman image storage, and tag${dockerMissingTags.length !== 1 ? "s" : ""} `
-                + `"${dockerMissingTags.join(", ")}" not found in Docker image storage.`
-            );
-        }
+            if (dockerFoundTags.length > 0) {
+                core.info(`Tag${dockerFoundTags.length !== 1 ? "s" : ""} "${dockerFoundTags.join(", ")}" `
+                + `found in Docker image storage`);
+            }
 
-        const allTagsinPodman: boolean = podmanFoundTags.length === normalizedTagsList.length;
-        const allTagsinDocker: boolean = dockerFoundTags.length === normalizedTagsList.length;
+            // Log warning if few tags are not found
+            if (dockerMissingTags.length > 0 && dockerFoundTags.length > 0) {
+                core.warning(`Tag${dockerMissingTags.length !== 1 ? "s" : ""} "${dockerMissingTags.join(", ")}" `
+                + `not found in Docker image storage`);
+            }
 
-        if (allTagsinPodman && allTagsinDocker) {
-            const isPodmanImageLatest = await isPodmanLocalImageLatest();
-            if (!isPodmanImageLatest) {
-                core.warning(
-                    `The version of "${sourceImages[0]}" in the Docker image storage is more recent `
-                        + `than the version in the Podman image storage. The image(s) from the Docker image storage `
-                        + `will be pushed.`
+            // failing if image with any of the tag is not found in Docker as well as Podman
+            if (podmanMissingTags.length > 0 && dockerMissingTags.length > 0) {
+                throw new Error(
+                    `❌ All tags were not found in either Podman image storage, or Docker image storage. `
+                    + `Tag${podmanMissingTags.length !== 1 ? "s" : ""} "${podmanMissingTags.join(", ")}" `
+                    + `not found in Podman image storage, and tag${dockerMissingTags.length !== 1 ? "s" : ""} `
+                    + `"${dockerMissingTags.join(", ")}" not found in Docker image storage.`
+                );
+            }
+
+            const allTagsinPodman: boolean = podmanFoundTags.length === normalizedTagsList.length;
+            const allTagsinDocker: boolean = dockerFoundTags.length === normalizedTagsList.length;
+
+            if (allTagsinPodman && allTagsinDocker) {
+                const isPodmanImageLatest = await isPodmanLocalImageLatest();
+                if (!isPodmanImageLatest) {
+                    core.warning(
+                        `The version of "${sourceImages[0]}" in the Docker image storage is more recent `
+                            + `than the version in the Podman image storage. The image(s) from the Docker `
+                            + `image storage will be pushed.`
+                    );
+                    isImageFromDocker = true;
+                }
+                else {
+                    core.warning(
+                        `The version of "${sourceImages[0]}" in the Podman image storage is more recent `
+                            + `than the version in the Docker image storage. The image(s) from the Podman `
+                            + `image storage will be pushed.`
+                    );
+                }
+            }
+            else if (allTagsinDocker) {
+                core.info(
+                    `Tag "${sourceImages[0]}" was found in the Docker image storage, but not in the `
+                        + `Podman image storage. The image(s) will be pulled into Podman image storage, `
+                        + `pushed, and then removed from the Podman image storage.`
                 );
                 isImageFromDocker = true;
             }
             else {
-                core.warning(
-                    `The version of "${sourceImages[0]}" in the Podman image storage is more recent `
-                        + `than the version in the Docker image storage. The image(s) from the Podman image `
-                        + `storage will be pushed.`
+                core.info(
+                    `Tag "${sourceImages[0]}" was found in the Podman image storage, but not in the `
+                        + `Docker image storage. The image(s) will be pushed from Podman image storage.`
                 );
             }
         }
-        else if (allTagsinDocker) {
-            core.info(
-                `Tag "${sourceImages[0]}" was found in the Docker image storage, but not in the Podman `
-                    + `image storage. The image(s) will be pulled into Podman image storage, pushed, and then `
-                    + `removed from the Podman image storage.`
-            );
-            isImageFromDocker = true;
+    }
+
+    // Set up Sigstore signing files before the push loop so they persist
+    // across all tag pushes and are cleaned up once afterward.
+    const sigstorePrivateKey = core.getInput(Inputs.SIGSTORE_PRIVATE_KEY);
+    const runnerTemp = process.env.RUNNER_TEMP || os.tmpdir();
+    const sigstorePrivateKeyFile = path.join(runnerTemp, "sigstore_private_key");
+    if (sigstorePrivateKey) {
+        try {
+            await fs.promises.writeFile(sigstorePrivateKeyFile, sigstorePrivateKey);
         }
-        else {
-            core.info(
-                `Tag "${sourceImages[0]}" was found in the Podman image storage, but not in the Docker `
-                    + `image storage. The image(s) will be pushed from Podman image storage.`
-            );
+        catch (err) {
+            throw new Error(`Could not write sigstore private key to temporary file `
+                + `"${sigstorePrivateKeyFile}"`, { cause: err });
+        }
+    }
+
+    const signPassphrase = core.getInput(Inputs.SIGN_PASSPHRASE);
+    const signPassphraseFile = path.join(runnerTemp, "sign_passphrase");
+    if (signPassphrase || sigstorePrivateKey) {
+        // Write passphrase (empty string if not provided) so that podman
+        // does not prompt interactively.
+        try {
+            await fs.promises.writeFile(signPassphraseFile, signPassphrase || "");
+        }
+        catch (err) {
+            throw new Error(`Could not write sign passphrase to temporary file `
+                + `"${signPassphraseFile}"`, { cause: err });
         }
     }
 
@@ -234,60 +304,100 @@ async function run(): Promise<void> {
         )}_digest.txt`;
     }
 
-    // push the image
-    for (let i = 0; i < destinationImages.length; i++) {
-        const args = [];
-        if (isImageFromDocker) {
-            args.push(...dockerPodmanOpts);
-        }
-        if (isManifest) {
-            args.push("manifest");
-        }
-        args.push(...[
-            "push",
-            "--quiet",
-            "--digestfile",
-            digestFile,
-            isImageFromDocker ? getFullDockerImageName(sourceImages[i]) : sourceImages[i],
-            destinationImages[i],
-        ]);
-        // to push all the images referenced in the manifest
-        if (isManifest) {
-            args.push("--all");
-        }
-        if (podmanExtraArgs.length > 0) {
-            args.push(...podmanExtraArgs);
-        }
+    try {
+        // push the image
+        for (let i = 0; i < destinationImages.length; i++) {
+            const args = [ ...globalPodmanArgs ];
+            if (isImageFromDocker) {
+                args.push(...dockerPodmanOpts);
+            }
+            if (isManifest) {
+                args.push("manifest");
+            }
 
-        // check if tls-verify is not set to null
-        if (tlsVerify) {
-            args.push(`--tls-verify=${tlsVerify}`);
-        }
+            // Qualify local source images with localhost/ to prevent podman
+            // from resolving unqualified names to remote registries (#66).
+            let pushSource: string;
+            if (isImageFromDocker) {
+                pushSource = getFullDockerImageName(sourceImages[i]);
+            }
+            else if (isFullImageNameTag) {
+                pushSource = sourceImages[i];
+            }
+            else {
+                pushSource = `localhost/${sourceImages[i]}`;
+            }
 
-        // check if registry creds are provided
-        if (creds) {
-            args.push(`--creds=${creds}`);
-        }
+            args.push(...[
+                "push",
+                "--quiet",
+                "--digestfile",
+                digestFile,
+                pushSource,
+                destinationImages[i],
+            ]);
+            // to push all the images referenced in the manifest
+            if (isManifest) {
+                args.push("--all");
+            }
+            if (podmanExtraArgs.length > 0) {
+                args.push(...podmanExtraArgs);
+            }
 
-        await execute(await getPodmanPath(), args);
-        core.info(`✅ Successfully pushed "${sourceImages[i]}" to "${destinationImages[i]}"`);
+            // check if tls-verify is not set to null
+            if (tlsVerify) {
+                args.push(`--tls-verify=${tlsVerify}`);
+            }
 
-        registryPathList.push(destinationImages[i]);
+            // check if registry creds are provided
+            if (creds) {
+                args.push(`--creds=${creds}`);
+            }
 
-        try {
-            const digest = (await fs.promises.readFile(digestFile)).toString();
-            core.info(digest);
-            // the digest should be the same for every image, but we log it every time
-            // due to https://github.com/redhat-actions/push-to-registry/issues/26
-            core.setOutput(Outputs.DIGEST, digest);
+            if (sigstorePrivateKey) {
+                args.push("--sign-by-sigstore-private-key");
+                args.push(sigstorePrivateKeyFile);
+            }
+
+            if (signPassphrase || sigstorePrivateKey) {
+                args.push("--sign-passphrase-file");
+                args.push(signPassphraseFile);
+            }
+
+            await execute(await getPodmanPath(), args);
+            core.info(`✅ Successfully pushed "${sourceImages[i]}" to "${destinationImages[i]}"`);
+
+            registryPathList.push(destinationImages[i]);
+
+            try {
+                const digest = (await fs.promises.readFile(digestFile)).toString();
+                core.info(digest);
+                // the digest should be the same for every image, but we log it every time
+                // due to https://github.com/redhat-actions/push-to-registry/issues/26
+                core.setOutput(Outputs.DIGEST, digest);
+            }
+            catch (err) {
+                core.warning(`Failed to read digest file "${digestFile}": ${err}`);
+            }
         }
-        catch (err) {
-            core.warning(`Failed to read digest file "${digestFile}": ${err}`);
-        }
+    }
+    finally {
+        // Clean up temporary signing files after all pushes complete
+        await cleanupTempFile(sigstorePrivateKeyFile);
+        await cleanupTempFile(signPassphraseFile);
     }
 
     core.setOutput(Outputs.REGISTRY_PATH, registryPathList[0]);
     core.setOutput(Outputs.REGISTRY_PATHS, JSON.stringify(registryPathList));
+}
+
+async function cleanupTempFile(filePath: string): Promise<void> {
+    try {
+        await fs.promises.unlink(filePath);
+    }
+    catch {
+        // File may not exist if it was never created; that is not an error.
+    }
 }
 
 async function pullImageFromDocker(): Promise<ImageStorageCheckResult> {
@@ -298,7 +408,7 @@ async function pullImageFromDocker(): Promise<ImageStorageCheckResult> {
         for (const imageWithTag of sourceImages) {
             const commandResult: ExecResult = await execute(
                 await getPodmanPath(),
-                [ ...dockerPodmanOpts, "pull", `docker-daemon:${imageWithTag}` ],
+                [ ...globalPodmanArgs, ...dockerPodmanOpts, "pull", `docker-daemon:${imageWithTag}` ],
                 { ignoreReturnCode: true, failOnStdErr: false, group: true }
             );
             if (commandResult.exitCode === 0) {
@@ -330,7 +440,7 @@ async function checkImageInPodman(): Promise<ImageStorageCheckResult> {
         for (const imageWithTag of sourceImages) {
             const commandResult: ExecResult = await execute(
                 await getPodmanPath(),
-                [ "image", "exists", imageWithTag ],
+                [ ...globalPodmanArgs, "image", "exists", imageWithTag ],
                 { ignoreReturnCode: true }
             );
             if (commandResult.exitCode === 0) {
@@ -360,6 +470,7 @@ async function isPodmanLocalImageLatest(): Promise<boolean> {
 
     // get creation time of the image present in the Podman image storage
     const podmanLocalImageTimeStamp = await execute(await getPodmanPath(), [
+        ...globalPodmanArgs,
         "image",
         "inspect",
         imageWithTag,
@@ -371,6 +482,7 @@ async function isPodmanLocalImageLatest(): Promise<boolean> {
     // appending 'docker.io/library' infront of image name as pulled image name
     // from Docker image storage starts with the 'docker.io/library'
     const pulledImageCreationTimeStamp = await execute(await getPodmanPath(), [
+        ...globalPodmanArgs,
         ...dockerPodmanOpts,
         "image",
         "inspect",
@@ -386,7 +498,7 @@ async function isPodmanLocalImageLatest(): Promise<boolean> {
     return podmanImageTime > dockerImageTime;
 }
 
-async function createDockerPodmanImageStroage(): Promise<void> {
+async function createDockerPodmanImageStorage(): Promise<void> {
     core.info(`Creating temporary Podman image storage for pulling from Docker daemon`);
     dockerPodmanRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), "podman-from-docker-"));
 
@@ -409,13 +521,13 @@ async function createDockerPodmanImageStroage(): Promise<void> {
     }
 }
 
-async function removeDockerPodmanImageStroage(): Promise<void> {
+async function removeDockerPodmanImageStorage(): Promise<void> {
     if (dockerPodmanRoot) {
         try {
             core.info(`Removing temporary Podman image storage for pulling from Docker daemon`);
             await execute(
                 await getPodmanPath(),
-                [ ...dockerPodmanOpts, "rmi", "-a", "-f" ]
+                [ ...globalPodmanArgs, ...dockerPodmanOpts, "rmi", "-a", "-f" ]
             );
             await fs.promises.rm(dockerPodmanRoot, { recursive: true, force: true });
         }
@@ -433,7 +545,7 @@ async function checkIfManifestsExists(): Promise<boolean> {
     for (const manifest of sourceImages) {
         const commandResult: ExecResult = await execute(
             await getPodmanPath(),
-            [ "manifest", "exists", manifest ],
+            [ ...globalPodmanArgs, "manifest", "exists", manifest ],
             { ignoreReturnCode: true, group: true }
         );
         if (commandResult.exitCode === 0) {
@@ -511,12 +623,24 @@ async function execute(
 }
 
 async function main(): Promise<void> {
+    isRemoteMode = core.getInput(Inputs.REMOTE) === "true";
+
+    if (isRemoteMode) {
+        globalPodmanArgs.push("--remote");
+        core.info("Running in remote mode (--remote). "
+            + "Docker image storage checks will be skipped.");
+    }
+
     try {
-        await createDockerPodmanImageStroage();
+        if (!isRemoteMode) {
+            await createDockerPodmanImageStorage();
+        }
         await run();
     }
     finally {
-        await removeDockerPodmanImageStroage();
+        if (!isRemoteMode) {
+            await removeDockerPodmanImageStorage();
+        }
     }
 }
 

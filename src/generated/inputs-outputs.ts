@@ -28,11 +28,40 @@ export enum Inputs {
      */
     PASSWORD = "password",
     /**
+     * Global args to be passed to all podman commands (before the subcommand).
+     * Use this for options like --storage-driver=vfs that must apply to every
+     * podman invocation (image exists, manifest exists, push, etc.).
+     * Separate arguments by newline. Do not use quotes.
+     * Required: false
+     * Default: None.
+     */
+    PODMAN_ARGS = "podman-args",
+    /**
      * Hostname and optional namespace to push the image to (eg. ghcr.io/username or ghcr.io)
      * Required: false
      * Default: None.
      */
     REGISTRY = "registry",
+    /**
+     * Use podman in remote mode (--remote). When true, --remote is passed to
+     * all podman commands and Docker image storage checks are skipped, since
+     * the Docker daemon is not accessible over the remote connection.
+     * Required: false
+     * Default: "false"
+     */
+    REMOTE = "remote",
+    /**
+     * Passphrase to unlock the Sigstore private key
+     * Required: false
+     * Default: None.
+     */
+    SIGN_PASSPHRASE = "sign-passphrase",
+    /**
+     * Sigstore private key to use to sign container images
+     * Required: false
+     * Default: None.
+     */
+    SIGSTORE_PRIVATE_KEY = "sigstore-private-key",
     /**
      * 'The tag or tags of the image/manifest to push.
      * For multiple tags, separate by whitespace. For example, "latest v1"'

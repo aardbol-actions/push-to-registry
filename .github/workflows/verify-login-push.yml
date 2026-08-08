@@ -23,8 +23,8 @@ jobs:
     outputs:
       action: ${{ steps.filter.outputs.action }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -46,7 +46,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Create Dockerfile
         run: |
@@ -57,7 +57,7 @@ jobs:
 
       - name: Build Image
         id: build_image
-        uses: aardbol-actions/buildah-build@efe897b4cfe775f3e057a442c3d9fbd9db18a669 # v3.0.2
+        uses: aardbol-actions/buildah-build@2e50c6f6077d4783d9919f2cc07009f0d3a750cd # v3.1.0
         with:
           image: ${{ env.IMAGE_NAME }}
           layers: false
@@ -66,7 +66,7 @@ jobs:
             ./Dockerfile
 
       - name: Podman Login
-        uses: redhat-actions/podman-login@4934294ad0449894bcd1e9f191899d7292469603 # v1
+        uses: redhat-actions/podman-login@50c2d9a331bb67c8fdab99b86455fad05e2e3252 # v2.0
         with:
           registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ github.actor }}

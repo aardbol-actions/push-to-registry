@@ -25,13 +25,17 @@ Refer to the [`podman push`](http://docs.podman.io/en/latest/markdown/podman-man
 
 | Input Name | Description | Default |
 | ---------- | ----------- | ------- |
-| image	| Name of the image or manifest you want to push. Eg. `username/imagename` or `imagename`. Refer to [Image and Tag Inputs](https://github.com/aardbol-actions/push-to-registry#image-tag-inputs). | **Required** - unless all tags include registry and image name
-| tags | The tag or tags of the image or manifest to push. For multiple tags, separate by whitespace. Refer to [Image and Tag Inputs](https://github.com/aardbol-actions/push-to-registry#image-tag-inputs). | `latest`
-| registry | Hostname and optional namespace to push the image to. Eg. `ghcr.io/username` or `ghcr.io/username/namespace`. Refer to [Image and Tag Inputs](https://github.com/aardbol-actions/push-to-registry#image-tag-inputs). | **Required** - unless all tags include registry and image name
+| image	| Name of the image or manifest you want to push. Eg. `username/imagename` or `imagename`. Refer to [Image and Tag Inputs](https://github.com/aardbol-actions/push-to-registry#image-tag-inputs). Automatically lowercased per OCI spec. | **Required** - unless all tags include registry and image name
+| tags | The tag or tags of the image or manifest to push. For multiple tags, separate by whitespace. Refer to [Image and Tag Inputs](https://github.com/aardbol-actions/push-to-registry#image-tag-inputs). Tag case is preserved (OCI spec allows uppercase in tags). | `latest`
+| registry | Hostname and optional namespace to push the image to. Eg. `ghcr.io/username` or `ghcr.io/username/namespace`. Refer to [Image and Tag Inputs](https://github.com/aardbol-actions/push-to-registry#image-tag-inputs). Automatically lowercased per OCI spec. | **Required** - unless all tags include registry and image name
 | username | Username with which to authenticate to the registry. Required unless already logged in to the registry. | None
 | password | Password, encrypted password, or access token to use to log in to the registry. Required unless already logged in to the registry. | None
 | tls-verify | Verify TLS certificates when contacting the registry. Set to `false` to skip certificate verification. | `true`
 | digestfile | After copying the image, write the digest of the resulting image to the file. The contents of this file are the digest output. | Auto-generated from image and tag
+| sigstore-private-key | Sigstore private key to use to sign container images. | None
+| sign-passphrase | Passphrase to unlock the Sigstore private key. | None
+| remote | Use podman in remote mode (`--remote`). When `true`, Docker image storage checks are skipped. | `false`
+| podman-args | Global args to be passed to all podman commands (before the subcommand). Use this for options like `--storage-driver=vfs`. Separate arguments by newline. | None
 | extra-args | Extra args to be passed to podman push. Separate arguments by newline. Do not use quotes. | None
 
 <a id="image-tag-inputs"></a>
@@ -64,6 +68,15 @@ will push the image tags: `ghcr.io/my-namespace/my-image:v1` and `ghcr.io/my-nam
 
 If the `tags` input does not have image names in the `${registry}/${name}:${tag}` form, then the `registry` and `image` inputs must be set.
 
+**Multi-line tags**: You can also provide tags on multiple lines using YAML pipe syntax:
+```yaml
+tags: |
+  v1
+  v1.0.0
+  latest
+```
+This is equivalent to `tags: v1 v1.0.0 latest`. Each line is treated as a separate tag.
+
 ## Action Outputs
 
 `digest`: The pushed image digest, as written to the `digestfile`.<br>
@@ -84,11 +97,34 @@ For example:
 
 `registry-path`: The first element of `registry-paths`, as a string.
 
+## Required Permissions
+
+The permissions required depend on the target registry:
+
+**GitHub Container Registry (GHCR)**:
+```yaml
+permissions:
+  contents: read
+  packages: write
+```
+- `packages: write` is required to push images to `ghcr.io`
+- `contents: read` is required if you use `actions/checkout` in your workflow
+
+**Other registries** (Quay.io, Docker Hub, private registries):
+```yaml
+permissions:
+  contents: read
+```
+- Authentication is handled via the `username` and `password` inputs, or by using [podman-login](https://github.com/redhat-actions/podman-login) beforehand
+- No special GitHub token permissions are needed beyond `contents: read` for checkout
+
 ## Pushing Manifest
 
 If multiple tags are provided, either all tags must point to manifests, or none of them. i.e., you cannot push both manifests are regular images in one `push-to-registry` step.
 
 Refer to [Manifest Build and Push example](./.github/workflows/push-manifest.yml) for a sophisticated example of building and pushing a manifest.
+
+**Multi-architecture manifests**: If you are building for architectures like `arm64` or `ppc64le`, you need `qemu-user-static` installed. Use `runs-on: ubuntu-24.04` which ships with qemu 8.2, as older versions have known issues with `ppc64le` (see [#85](https://github.com/redhat-actions/push-to-registry/issues/85)).
 
 ## Examples
 
@@ -97,6 +133,9 @@ The example below shows how the `push-to-registry` action can be used to push an
 ```yaml
 name: Build and Push Image
 on: [ push ]
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -142,6 +181,25 @@ If the image to push is present in the Docker image storage but not in the Podma
 If the image to push is present in both the Docker and Podman image storage, the action will push the image which was more recently built, and log a warning.
 
 If the action pulled an image from the Docker image storage into the Podman storage, it will be cleaned up from the Podman storage before the action exits.
+
+## Podman Remote Mode
+
+If you are using `podman --remote` (e.g. with a wrapper or a remote podman server), set `remote: true`:
+
+```yaml
+- uses: aardbol-actions/push-to-registry@v3
+  with:
+    image: my-image
+    tags: latest
+    registry: quay.io/my-namespace
+    remote: true
+```
+
+When `remote` is enabled:
+- `--remote` is automatically passed to all podman commands
+- Docker image storage checks are skipped (the Docker daemon is not accessible over the remote connection)
+- All image tags must be present in the remote Podman image storage
+- Temporary local storage creation is skipped (not relevant for remote operations)
 
 ## Note about GitHub runners and Podman
 We recommend using `ubuntu-24.04` since it has a newer version of Podman.
