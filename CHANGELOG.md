@@ -12,6 +12,8 @@
 - ci: Bump `redhat-actions/podman-login` from v1 to v2 (upstream #127)
 - ci: Add test job and native node test runner
 - chore(deps): Bump `eslint` from 10.6.0 to 10.8.1
+- chore(deps): Bump `typescript-eslint`/`@typescript-eslint/*` to 8.66.0
+- chore(deps): Bump `@types/node` to 26.2.0
 
 ## v3.0.3
 - chore(deps): Bump `undici` from 6.27.0 to 6.28.0 (#2)
