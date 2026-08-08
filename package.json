@@ -12,7 +12,7 @@
     "bundle": "ncc build src/index.ts --source-map --minify",
     "clean": "rm -rf out/ dist/",
     "lint": "eslint . --max-warnings=0",
-"generate-ios": "npx @aardbol-actions/action-io-generator -w -o ./src/generated/inputs-outputs.ts",
+    "generate-ios": "npx @aardbol-actions/action-io-generator -w -o ./src/generated/inputs-outputs.ts",
     "test": "node --experimental-strip-types --test src/**/*.test.ts"
   },
   "author": "Red Hat",
