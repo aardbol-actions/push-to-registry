@@ -32,12 +32,12 @@ jobs:
         run: npm run test
 
       - name: Verify Latest Bundle
-        uses: aardbol-actions/common/bundle-verifier@a237273f41dc217821aff666362bd4aa739b18f9 # v2.0.1
+        uses: aardbol-actions/common/bundle-verifier@017965ebb345a5b8c78f44f8345a7132e263280f # v2.1.1
         with:
           bundle_file: ${{ env.BUNDLE_FILE }}
           bundle_command: ${{ env.BUNDLE_COMMAND }}
 
       - name: Verify Input and Output enums
-        uses: aardbol-actions/common/action-io-generator@a237273f41dc217821aff666362bd4aa739b18f9 # v2.0.1
+        uses: aardbol-actions/common/action-io-generator@017965ebb345a5b8c78f44f8345a7132e263280f # v2.1.1
         with:
           io_file: ${{ env.IO_FILE }}

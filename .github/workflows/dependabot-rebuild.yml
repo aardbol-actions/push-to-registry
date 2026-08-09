@@ -1,5 +1,4 @@
 name: Rebuild bundle for Dependabot PRs
-
 on:
   push:
     branches:
